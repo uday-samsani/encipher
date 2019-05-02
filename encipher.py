@@ -7,21 +7,19 @@ from Crypto.Protocol.KDF import PBKDF2
 
 
 class Encipher:
-    def __init__(self, password, seed, inFileName, outFileName=None):
+    def __init__(self, password, seed):
         self.key = PBKDF2(password, seed, dkLen=16)
-        self.inFileName = inFileName
-        self.outFileName = outFileName
 
-    def encryptFile(self, chunkSize=64*1024):
-        if not self.outFileName:
-            self.outFileName = self.inFileName + '.enc'
+    def encryptFile(self, inFileName, outFileName=None, chunkSize=64*1024):
+        if not outFileName:
+            outFileName = inFileName + '.enc'
 
         iv = get_random_bytes(16)
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
-        fileSize = os.path.getsize(self.inFileName)
+        fileSize = os.path.getsize(inFileName)
 
-        with open(self.inFileName, 'rb') as inFile:
-            with open(self.outFileName, 'wb') as outFile:
+        with open(inFileName, 'rb') as inFile:
+            with open(outFileName, 'wb') as outFile:
                 outFile.write(struct.pack('<Q', fileSize))
                 outFile.write(iv)
 
@@ -34,17 +32,17 @@ class Encipher:
 
                     outFile.write(cipher.encrypt(chunk))
 
-    def decryptFile(self, chunkSize=24*1024):
-        if not self.outFileName:
-            self.outFileName = os.path.splitext(self.inFileName)[0]
+    def decryptFile(self, inFileName, outFileName=None, chunkSize=24*1024):
+        if not outFileName:
+            outFileName = os.path.splitext(inFileName)[0]
 
-        with open(self.inFileName, 'rb') as inFile:
+        with open(inFileName, 'rb') as inFile:
             origSize = struct.unpack(
                 '<Q', inFile.read(struct.calcsize('Q')))[0]
             iv = inFile.read(16)
             decipher = AES.new(self.key, AES.MODE_CBC, iv)
 
-            with open(self.outFileName, 'wb') as outFile:
+            with open(outFileName, 'wb') as outFile:
                 while True:
                     chunk = inFile.read(chunkSize)
                     if len(chunk) == 0:
@@ -53,16 +51,27 @@ class Encipher:
 
                 outFile.truncate(origSize)
 
+    def encryptDir(self, inDirName, outDirName=None):
+        dirList = os.listdir(inDirName)
+        for fileName in dirList:
+            if os.path.isfile(inDirName + fileName):
+                self.encryptFile(inDirName + fileName)
+            elif os.path.isdir(inDirName + fileName):
+                self.encryptDir(inDirName + fileName)
+
 
 def main():
     password = sys.argv[1]
     seed = sys.argv[2]
-    inFileName = sys.argv[3]
-    encrypter = Encipher(password, seed, inFileName)
-    if os.path.splitext(inFileName)[1] != '.enc':
-        encrypter.encryptFile()
-    else:
-        encrypter.decryptFile()
+    inName = sys.argv[3]
+    encrypter = Encipher(password, seed)
+    if os.path.isfile(inName):
+        if os.path.splitext(inName)[1] != '.enc':
+            encrypter.encryptFile(inName)
+        else:
+            encrypter.decryptFile(inName)
+    elif os.path.isdir(inName):
+        encrypter.encryptDir(inName)
 
 
 if __name__ == "__main__":
