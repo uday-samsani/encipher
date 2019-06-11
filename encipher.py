@@ -1,6 +1,7 @@
 import os
 import struct
 import sys
+import zlib
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from Crypto.Protocol.KDF import PBKDF2
@@ -22,7 +23,6 @@ class Encipher:
             with open(outFileName, 'wb') as outFile:
                 outFile.write(struct.pack('<Q', fileSize))
                 outFile.write(iv)
-
                 while True:
                     chunk = inFile.read(chunkSize)
                     if len(chunk) == 0:
@@ -59,6 +59,38 @@ class Encipher:
             elif os.path.isdir(inDirName + fileName):
                 self.encryptDir(inDirName + fileName)
 
+    def decryptDir(self, inDirName, outDirName=None):
+        dirList = os.listdir(inDirName)
+        for fileName in dirList:
+            if os.path.isfile(inDirName + fileName):
+                self.decryptFile(inDirName + fileName)
+            elif os.path.isdir(inDirName + fileName):
+                self.decryptDir(inDirName + fileName)
+
+
+class Compresser:
+    def compressFile(self, inFileName, outFileName=None):
+        with open(inFileName, 'rb') as inFile:
+            with open(inFileName, 'wb') as outFile:
+                plainData = inFile.read()
+                compData = zlib.compress(plainData, 6)
+                outFile.write(compData)
+
+    def decompressFile(self, inFileName, outFileName=None):
+        with open(inFileName, 'rb') as inFile:
+            with open(inFileName, 'wb') as outFile:
+                compData = inFile.read()
+                print(compData)
+                plainData = zlib.decompress(
+                    compData, wbits=zlib.MAX_WBITS, bufsize=zlib.DEF_BUF_SIZE)
+                outFile.write(plainData)
+
+
+def main1():
+    inFileName = sys.argv[1]
+    a = Compresser()
+    a.decompressFile(inFileName)
+
 
 def main():
     password = sys.argv[1]
@@ -75,4 +107,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main1()
